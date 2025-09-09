@@ -1,0 +1,11 @@
+/* Shared layout and components */
+body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+.container { max-width: 1200px; margin: 0 auto; }
+.nav { background: #333; padding: 10px; margin-bottom: 20px; border-radius: 5px; }
+.nav a { color: white; text-decoration: none; margin-right: 15px; padding: 5px 10px; border-radius: 3px; }
+.nav a:hover { background: #555; }
+.btn { background: #007bff; color: white; padding: 10px 16px; border: none; border-radius: 6px; cursor: pointer; }
+.btn:hover { background: #0056b3; }
+.btn.secondary { background: #6c757d; }
+.btn.secondary:hover { background: #565e64; }
+.btn.block { width: 100%; }
