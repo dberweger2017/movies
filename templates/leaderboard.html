@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+
+{% block title %}Movie ELO - Leaderboard{% endblock %}
+
+{% block head %}
+<style>
+    table { width: 100%; border-collapse: collapse; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    th, td { padding: 15px; text-align: left; border-bottom: 1px solid #ddd; }
+    th { background: #f8f9fa; font-weight: bold; }
+    .rank { font-weight: bold; color: #007bff; font-size: 18px; }
+    .movie-img-small { width: 60px; height: 90px; object-fit: cover; border-radius: 5px; }
+    .movie-name { font-weight: bold; font-size: 16px; }
+    .elo-rating { font-size: 18px; font-weight: bold; color: #28a745; }
+    tr:hover { background: #f8f9fa; }
+    .no-movies { text-align: center; padding: 40px; color: #666; }
+    .trophy { font-size: 24px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1 style="text-align: center; color: #333;">🏆 Movie Leaderboard</h1>
+
+{% if movies %}
+    <table>
+        <thead>
+            <tr>
+                <th>Rank</th>
+                <th>Movie</th>
+                <th>Name</th>
+                <th>ELO Rating</th>
+                <th>Matches Played</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for movie in movies %}
+            <tr>
+                <td class="rank">
+                    {% if loop.index == 1 %}🥇
+                    {% elif loop.index == 2 %}🥈
+                    {% elif loop.index == 3 %}🥉
+                    {% else %}{{ loop.index }}
+                    {% endif %}
+                </td>
+                <td>
+                    {% if movie[1] %}
+                        <img src="{{ movie[1] }}" alt="{{ movie[0] }}" class="movie-img-small">
+                    {% else %}
+                        <div class="movie-img-small" style="background: #ddd; display: flex; align-items: center; justify-content: center; color: #666; font-size: 10px;">No Image</div>
+                    {% endif %}
+                </td>
+                <td class="movie-name">{{ movie[0] }}</td>
+                <td class="elo-rating">{{ movie[2] }}</td>
+                <td>{{ movie[3] }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <div class="no-movies">
+        <p>No movies added yet!</p>
+        <a href="/new" class="btn">Add Your First Movie</a>
+    </div>
+{% endif %}
+{% endblock %}

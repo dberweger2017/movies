@@ -1,0 +1,318 @@
+{% extends 'base.html' %}
+
+{% block title %}Movie ELO - Match{% endblock %}
+
+{% block head %}
+<style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .movie-card { background: white; border-radius: 10px; padding: 24px; margin: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); text-align: center; }
+        .match-container { display: flex; justify-content: center; gap: 24px; flex-wrap: wrap; }
+        .movie-option { cursor: pointer; transition: transform 0.2s; }
+        .movie-option:hover { transform: scale(1.05); }
+        .movie-img { width: 250px; height: 375px; object-fit: cover; border-radius: 6px; }
+        .movie-title { margin-top: 12px; font-size: 20px; font-weight: bold; }
+        .elo { opacity: 0; transform: translateY(-6px); transition: opacity 0.35s ease, transform 0.35s ease, color 0.25s ease; color: #666; margin-top: 6px; font-size: 14px; }
+        .elo.show { opacity: 1; transform: translateY(0); }
+        .elo.gain { color: #28a745; }
+        .elo.loss { color: #dc3545; }
+        .elo.bump { transform: translateY(0) scale(1.08); }
+        .vs { font-size: 48px; font-weight: bold; color: #007bff; display: flex; align-items: center; }
+        .error { color: red; text-align: center; padding: 20px; }
+        .loading { display: none; text-align: center; color: #007bff; }
+        .actions { margin-top: 16px; display: flex; justify-content: center; gap: 12px; }
+        .btn { background: #007bff; color: white; padding: 10px 16px; border: none; border-radius: 6px; cursor: pointer; }
+        .btn:hover { background: #0056b3; }
+        .btn.secondary { background: #6c757d; }
+        .btn.secondary:hover { background: #565e64; }
+        .fly-token { position: fixed; z-index: 1000; background: #ffc107; color: #212529; padding: 6px 10px; border-radius: 999px; box-shadow: 0 3px 10px rgba(0,0,0,0.2); font-weight: bold; pointer-events: none; opacity: 0.95; transition: transform 0.38s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.18s ease-out; }
+    </style>
+{% endblock %}
+
+{% block content %}
+        <h1 style="text-align: center; color: #333;">Choose Your Favorite</h1>
+
+        {% if error %}
+            <div class="error">{{ error }}</div>
+            <div style="text-align: center; margin-top: 20px;">
+                <a href="/new" style="background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Add Your First Movie</a>
+            </div>
+        {% else %}
+            <div class="match-container">
+                <div class="movie-card movie-option" data-side="left" data-id="{{ movies[0][0] }}" onclick="vote({{ movies[0][0] }}, {{ movies[1][0] }})">
+                    {% if movies[0][2] %}
+                        <img src="{{ movies[0][2] }}" alt="{{ movies[0][1] }}" class="movie-img">
+                    {% else %}
+                        <div class="movie-img" style="background: #ddd; display: flex; align-items: center; justify-content: center; color: #666;">No Image</div>
+                    {% endif %}
+                    <div class="movie-title">{{ movies[0][1] }}</div>
+                    <div class="elo" data-elo="{{ movies[0][3] }}">ELO: {{ movies[0][3] }}</div>
+                </div>
+                
+                <div class="vs">VS</div>
+                
+                <div class="movie-card movie-option" data-side="right" data-id="{{ movies[1][0] }}" onclick="vote({{ movies[1][0] }}, {{ movies[0][0] }})">
+                    {% if movies[1][2] %}
+                        <img src="{{ movies[1][2] }}" alt="{{ movies[1][1] }}" class="movie-img">
+                    {% else %}
+                        <div class="movie-img" style="background: #ddd; display: flex; align-items: center; justify-content: center; color: #666;">No Image</div>
+                    {% endif %}
+                    <div class="movie-title">{{ movies[1][1] }}</div>
+                    <div class="elo" data-elo="{{ movies[1][3] }}">ELO: {{ movies[1][3] }}</div>
+                </div>
+            </div>
+
+            <div class="actions">
+                <button class="btn" onclick="tie({{ movies[0][0] }}, {{ movies[1][0] }})">It's a tie</button>
+                <button class="btn secondary" onclick="skip({{ movies[0][0] }}, {{ movies[1][0] }})">I haven't seen at least one</button>
+            </div>
+            
+            <div class="loading">
+                <p>Processing your vote...</p>
+            </div>
+        {% endif %}
+{% endblock %}
+
+{% block scripts %}
+    <script>
+        // Track current pair IDs and submission state
+        const leftId = {{ movies[0][0] }};
+        const rightId = {{ movies[1][0] }};
+        let busy = false;
+
+        function revealElo() {
+            document.querySelectorAll('.elo').forEach(el => el.classList.add('show'));
+        }
+
+        function startLoading() {
+            document.querySelector('.match-container').style.display = 'none';
+            document.querySelector('.loading').style.display = 'block';
+        }
+
+        function getEloEl(side) {
+            return document.querySelector(`.movie-card[data-side="${side}"] .elo`);
+        }
+
+        function getElo(side) {
+            const el = getEloEl(side);
+            return parseInt(el.getAttribute('data-elo'), 10);
+        }
+
+        function setElo(side, value) {
+            const el = getEloEl(side);
+            el.setAttribute('data-elo', value);
+            el.textContent = `ELO: ${value}`;
+        }
+
+        function markDelta(side, delta) {
+            const el = getEloEl(side);
+            el.classList.remove('gain', 'loss', 'bump');
+            if (delta > 0) el.classList.add('gain');
+            if (delta < 0) el.classList.add('loss');
+            // subtle bump animation
+            requestAnimationFrame(() => {
+                el.classList.add('bump');
+                setTimeout(() => el.classList.remove('bump'), 160);
+            });
+        }
+
+        function eloDeltaOnWin(winnerElo, loserElo, k = 32) {
+            const expectedWinner = 1 / (1 + Math.pow(10, (loserElo - winnerElo) / 400));
+            const delta = Math.round(k * (1 - expectedWinner));
+            return delta;
+        }
+
+        function eloDeltaOnTie(aElo, bElo, k = 32) {
+            const expectedA = 1 / (1 + Math.pow(10, (bElo - aElo) / 400));
+            const deltaA = Math.round(k * (0.5 - expectedA));
+            const deltaB = -deltaA; // keep symmetric for the transfer animation
+            return { deltaA, deltaB };
+        }
+
+        function flyPoints(fromSide, toSide, amount, done) {
+            if (amount <= 0) { done && done(); return; }
+            const fromEl = getEloEl(fromSide);
+            const toEl = getEloEl(toSide);
+            const fromRect = fromEl.getBoundingClientRect();
+            const toRect = toEl.getBoundingClientRect();
+            const startX = fromRect.left + fromRect.width / 2;
+            const startY = fromRect.top + fromRect.height / 2;
+            const endX = toRect.left + toRect.width / 2;
+            const endY = toRect.top + toRect.height / 2;
+
+            const token = document.createElement('div');
+            token.className = 'fly-token';
+            token.textContent = `+${amount}`;
+            token.style.left = '0px';
+            token.style.top = '0px';
+            token.style.transform = `translate(${startX}px, ${startY}px)`;
+            document.body.appendChild(token);
+
+            // Force layout, then animate to destination
+            requestAnimationFrame(() => {
+                token.style.transform = `translate(${endX}px, ${endY}px)`;
+            });
+
+            setTimeout(() => {
+                token.style.opacity = '0';
+                setTimeout(() => {
+                    token.remove();
+                    done && done();
+                }, 180);
+            }, 380);
+        }
+
+        function vote(winnerId, loserId) {
+            if (busy) return;
+            busy = true;
+            revealElo();
+
+            const winnerSide = winnerId === leftId ? 'left' : 'right';
+            const loserSide = winnerSide === 'left' ? 'right' : 'left';
+            const winnerElo = getElo(winnerSide);
+            const loserElo = getElo(loserSide);
+            const transfer = eloDeltaOnWin(winnerElo, loserElo);
+
+            // Apply immediate decrease to loser, then animate transfer, then increase winner
+            setElo(loserSide, loserElo - transfer);
+            markDelta(loserSide, -transfer);
+
+            flyPoints(loserSide, winnerSide, transfer, () => {
+                setElo(winnerSide, winnerElo + transfer);
+                markDelta(winnerSide, transfer);
+                startLoading();
+                fetch('/vote', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ winner_id: winnerId, loser_id: loserId })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) { location.reload(); }
+                    else {
+                        alert('Error processing vote');
+                        document.querySelector('.match-container').style.display = 'flex';
+                        document.querySelector('.loading').style.display = 'none';
+                        busy = false;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error processing vote');
+                    document.querySelector('.match-container').style.display = 'flex';
+                    document.querySelector('.loading').style.display = 'none';
+                    busy = false;
+                });
+            });
+        }
+
+        function tie(movieAId, movieBId) {
+            if (busy) return;
+            busy = true;
+            revealElo();
+
+            const leftE = getElo('left');
+            const rightE = getElo('right');
+            const { deltaA, deltaB } = eloDeltaOnTie(leftE, rightE);
+
+            // Determine direction: points move from the negative delta side to the positive
+            if (deltaA < 0 && deltaB > 0) {
+                setElo('left', leftE + deltaA);
+                markDelta('left', deltaA);
+                flyPoints('left', 'right', deltaB, () => {
+                    setElo('right', rightE + deltaB);
+                    markDelta('right', deltaB);
+                    startLoading();
+                    fetch('/tie', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ movie_a_id: movieAId, movie_b_id: movieBId })
+                    })
+                    .then(r => r.json())
+                    .then(d => { if (d.success) location.reload(); else throw new Error('Tie failed'); })
+                    .catch(err => {
+                        console.error(err);
+                        alert('Error processing tie');
+                        document.querySelector('.match-container').style.display = 'flex';
+                        document.querySelector('.loading').style.display = 'none';
+                        busy = false;
+                    });
+                });
+            } else if (deltaB < 0 && deltaA > 0) {
+                setElo('right', rightE + deltaB);
+                markDelta('right', deltaB);
+                flyPoints('right', 'left', deltaA, () => {
+                    setElo('left', leftE + deltaA);
+                    markDelta('left', deltaA);
+                    startLoading();
+                    fetch('/tie', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ movie_a_id: movieAId, movie_b_id: movieBId })
+                    })
+                    .then(r => r.json())
+                    .then(d => { if (d.success) location.reload(); else throw new Error('Tie failed'); })
+                    .catch(err => {
+                        console.error(err);
+                        alert('Error processing tie');
+                        document.querySelector('.match-container').style.display = 'flex';
+                        document.querySelector('.loading').style.display = 'none';
+                        busy = false;
+                    });
+                });
+            } else {
+                // No visible change; just proceed
+                startLoading();
+                fetch('/tie', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ movie_a_id: movieAId, movie_b_id: movieBId })
+                })
+                .then(r => r.json())
+                .then(d => { if (d.success) location.reload(); else throw new Error('Tie failed'); })
+                .catch(err => {
+                    console.error(err);
+                    alert('Error processing tie');
+                    document.querySelector('.match-container').style.display = 'flex';
+                    document.querySelector('.loading').style.display = 'none';
+                    busy = false;
+                });
+            }
+        }
+
+        function skip(movieAId, movieBId) {
+            // No need to reveal ELO for skip
+            if (busy) return;
+            busy = true;
+            startLoading();
+            fetch('/skip', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ movie_a_id: movieAId, movie_b_id: movieBId })
+            })
+            .then(response => response.json())
+            .then(data => { if (data.success) { location.reload(); } else { throw new Error('Skip failed'); } })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error skipping this pair');
+                document.querySelector('.match-container').style.display = 'flex';
+                document.querySelector('.loading').style.display = 'none';
+                busy = false;
+            });
+        }
+
+        // Keyboard support: Left/Right arrows select left/right movie
+        window.addEventListener('keydown', (e) => {
+            if (busy) return;
+            const containerVisible = getComputedStyle(document.querySelector('.match-container')).display !== 'none';
+            if (!containerVisible) return;
+            if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                vote(leftId, rightId);
+            } else if (e.key === 'ArrowRight') {
+                e.preventDefault();
+                vote(rightId, leftId);
+            }
+        });
+    </script>
+{% endblock %}
