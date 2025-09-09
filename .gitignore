@@ -1,3 +1,4 @@
 .venv
 .env
 movies.log
+/__pycache__
