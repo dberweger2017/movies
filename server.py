@@ -192,48 +192,6 @@ def add_movie():
     
     return redirect(url_for('leaderboard'))
 
-# HTML Templates as strings (you can save these as separate .html files in a 'templates' folder)
-@app.route('/templates/base.html')
-def base_template():
-    return '''
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Movie ELO{% endblock %}</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
-        .container { max-width: 1200px; margin: 0 auto; }
-        .nav { background: #333; padding: 10px; margin-bottom: 20px; border-radius: 5px; }
-        .nav a { color: white; text-decoration: none; margin-right: 15px; padding: 5px 10px; border-radius: 3px; }
-        .nav a:hover { background: #555; }
-        .movie-card { background: white; border-radius: 10px; padding: 20px; margin: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .match-container { display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; }
-        .movie-option { cursor: pointer; transition: transform 0.2s; }
-        .movie-option:hover { transform: scale(1.05); }
-        .movie-img { width: 200px; height: 300px; object-fit: cover; border-radius: 5px; }
-        .btn { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; }
-        .btn:hover { background: #0056b3; }
-        table { width: 100%; border-collapse: collapse; background: white; }
-        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
-        th { background: #f8f9fa; }
-        .rank { font-weight: bold; color: #007bff; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <nav class="nav">
-            <a href="/match">Match Movies</a>
-            <a href="/see">Leaderboard</a>
-            <a href="/new">Add Movie</a>
-        </nav>
-        {% block content %}{% endblock %}
-    </div>
-</body>
-</html>
-'''
-
 if __name__ == '__main__':
     init_db()
     app.run(debug=True)
