@@ -1,5 +1,0 @@
-nohup: ignoring input
-[2025-09-09 07:58:59 -0400] [125103] [INFO] Starting gunicorn 23.0.0
-[2025-09-09 07:58:59 -0400] [125103] [INFO] Listening at: http://127.0.0.1:8788 (125103)
-[2025-09-09 07:58:59 -0400] [125103] [INFO] Using worker: sync
-[2025-09-09 07:58:59 -0400] [125104] [INFO] Booting worker with pid: 125104
