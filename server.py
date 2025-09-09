@@ -1,8 +1,9 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for, session
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session, abort
 import sqlite3
 import random
 import math
 from datetime import datetime
+import os
 
 app = Flask(__name__)
 app.secret_key = 'change-me-in-production'
@@ -167,7 +168,7 @@ def skip():
 def leaderboard():
     conn = sqlite3.connect('movies.db')
     c = conn.cursor()
-    c.execute('''SELECT name, image_url, elo_rating, matches_played 
+    c.execute('''SELECT id, name, image_url, elo_rating, matches_played 
                  FROM movies 
                  ORDER BY elo_rating DESC''')
     movies = c.fetchall()
@@ -177,10 +178,14 @@ def leaderboard():
 
 @app.route('/new')
 def add_movie_form():
+    if not session.get('admin'):
+        return redirect(url_for('login', next=url_for('add_movie_form')))
     return render_template('add_movie.html')
 
 @app.route('/add', methods=['POST'])
 def add_movie():
+    if not session.get('admin'):
+        return redirect(url_for('login', next=url_for('add_movie')))
     name = request.form['name']
     image_url = request.form['image_url']
     
@@ -190,6 +195,37 @@ def add_movie():
     conn.commit()
     conn.close()
     
+    return redirect(url_for('leaderboard'))
+
+@app.route('/delete/<int:movie_id>', methods=['POST'])
+def delete_movie(movie_id):
+    if not session.get('admin'):
+        abort(403)
+    conn = sqlite3.connect('movies.db')
+    c = conn.cursor()
+    c.execute('DELETE FROM matches WHERE winner_id = ? OR loser_id = ?', (movie_id, movie_id))
+    c.execute('DELETE FROM movies WHERE id = ?', (movie_id,))
+    conn.commit()
+    conn.close()
+    return redirect(url_for('leaderboard'))
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    next_url = request.args.get('next') or request.form.get('next') or url_for('leaderboard')
+    error = None
+    if request.method == 'POST':
+        password = request.form.get('password', '')
+        admin_pwd = os.environ.get('ADMIN_PASSWORD') or os.environ.get('ADD_MOVIE_PASSWORD')
+        if admin_pwd and password == admin_pwd:
+            session['admin'] = True
+            return redirect(next_url)
+        else:
+            error = 'Invalid password'
+    return render_template('login.html', error=error, next_url=next_url)
+
+@app.route('/logout', methods=['POST'])
+def logout():
+    session.pop('admin', None)
     return redirect(url_for('leaderboard'))
 
 if __name__ == '__main__':

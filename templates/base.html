@@ -13,9 +13,23 @@
 <body>
     <div class="container">
         <nav class="nav">
-            <a href="/match">Match Movies</a>
-            <a href="/see">Leaderboard</a>
-            <a href="/new">Add Movie</a>
+            <div class="nav-left">
+                <a href="/match">Match Movies</a>
+                <a href="/see">Leaderboard</a>
+                {% if session.get('admin') %}
+                <a href="/new">Add Movie</a>
+                {% endif %}
+            </div>
+            <div class="nav-right">
+                {% if session.get('admin') %}
+                <span class="badge admin" title="You are logged in as admin">Admin</span>
+                <form action="/logout" method="post" style="display:inline;">
+                    <button type="submit" class="btn secondary">Logout</button>
+                </form>
+                {% else %}
+                <a href="/login">Log in</a>
+                {% endif %}
+            </div>
         </nav>
         {% block content %}{% endblock %}
     </div>
