@@ -4,9 +4,12 @@ import random
 import math
 from datetime import datetime
 import os
+from dotenv import load_dotenv
+
+load_dotenv()  # Load environment variables from .env if present
 
 app = Flask(__name__)
-app.secret_key = 'change-me-in-production'
+app.secret_key = os.environ.get('SECRET_KEY', 'change-me-in-production')
 
 # Database setup
 def init_db():
