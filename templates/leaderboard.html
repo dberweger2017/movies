@@ -4,6 +4,7 @@
 
 {% block head %}
 <style>
+    /* Table styles for ranks 4+ */
     table { width: 100%; border-collapse: collapse; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
     th, td { padding: 15px; text-align: left; border-bottom: 1px solid #ddd; }
     th { background: #f8f9fa; font-weight: bold; }
@@ -13,14 +14,85 @@
     .elo-rating { font-size: 18px; font-weight: bold; color: #28a745; }
     tr:hover { background: #f8f9fa; }
     .no-movies { text-align: center; padding: 40px; color: #666; }
-    .trophy { font-size: 24px; }
+
+    /* Podium styles */
+    .podium-wrap { position: relative; margin: 20px auto 30px; max-width: 900px; }
+    .confetti-container { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
+    .podium { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; align-items: end; }
+    .podium-item { text-align: center; }
+    .podium-stand { background: linear-gradient(180deg, #f8f9fa, #e9ecef); border-radius: 10px 10px 0 0; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: center; color: #333; font-weight: bold; }
+    .podium-stand.first { height: 180px; }
+    .podium-stand.second { height: 140px; }
+    .podium-stand.third { height: 120px; }
+    .podium-medal { font-size: 28px; margin-bottom: 8px; }
+    .podium-img { width: 100px; height: 150px; object-fit: cover; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+    .podium-name { font-weight: bold; margin-top: 8px; font-size: 18px; }
+    .podium-elo { color: #28a745; font-weight: bold; margin-top: 4px; }
+
+    /* Confetti pieces */
+    .confetti { position: fixed; width: 10px; height: 14px; opacity: 0.9; will-change: transform, opacity; animation: confetti-fall linear forwards; }
+    @keyframes confetti-fall {
+        0% { transform: translateY(-10vh) rotate(0deg); }
+        100% { transform: translateY(110vh) rotate(720deg); opacity: 0.9; }
+    }
 </style>
 {% endblock %}
 
 {% block content %}
 <h1 style="text-align: center; color: #333;">🏆 Movie Leaderboard</h1>
 
-{% if movies %}
+{% if movies and movies|length > 0 %}
+    {% set top = movies[:3] %}
+    {% set rest = movies[3:] %}
+
+    {% if top|length > 0 %}
+    <div class="podium-wrap">
+        <div class="confetti-container" id="confetti"></div>
+        <div class="podium">
+            <div class="podium-item" style="order:1">
+                {% if top|length > 1 %}
+                    <div class="podium-medal">🥈</div>
+                    {% if top[1][1] %}
+                        <img class="podium-img" src="{{ top[1][1] }}" alt="{{ top[1][0] }}">
+                    {% else %}
+                        <div class="podium-img" style="background:#ddd; display:flex; align-items:center; justify-content:center; color:#666;">No Image</div>
+                    {% endif %}
+                    <div class="podium-name">{{ top[1][0] }}</div>
+                    <div class="podium-elo">{{ top[1][2] }}</div>
+                    <div class="podium-stand second">2</div>
+                {% endif %}
+            </div>
+            <div class="podium-item" style="order:0">
+                {% if top|length > 0 %}
+                    <div class="podium-medal">🥇</div>
+                    {% if top[0][1] %}
+                        <img class="podium-img" src="{{ top[0][1] }}" alt="{{ top[0][0] }}">
+                    {% else %}
+                        <div class="podium-img" style="background:#ddd; display:flex; align-items:center; justify-content:center; color:#666;">No Image</div>
+                    {% endif %}
+                    <div class="podium-name">{{ top[0][0] }}</div>
+                    <div class="podium-elo">{{ top[0][2] }}</div>
+                    <div class="podium-stand first">1</div>
+                {% endif %}
+            </div>
+            <div class="podium-item" style="order:2">
+                {% if top|length > 2 %}
+                    <div class="podium-medal">🥉</div>
+                    {% if top[2][1] %}
+                        <img class="podium-img" src="{{ top[2][1] }}" alt="{{ top[2][0] }}">
+                    {% else %}
+                        <div class="podium-img" style="background:#ddd; display:flex; align-items:center; justify-content:center; color:#666;">No Image</div>
+                    {% endif %}
+                    <div class="podium-name">{{ top[2][0] }}</div>
+                    <div class="podium-elo">{{ top[2][2] }}</div>
+                    <div class="podium-stand third">3</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if rest and rest|length > 0 %}
     <table>
         <thead>
             <tr>
@@ -32,15 +104,9 @@
             </tr>
         </thead>
         <tbody>
-            {% for movie in movies %}
+            {% for movie in rest %}
             <tr>
-                <td class="rank">
-                    {% if loop.index == 1 %}🥇
-                    {% elif loop.index == 2 %}🥈
-                    {% elif loop.index == 3 %}🥉
-                    {% else %}{{ loop.index }}
-                    {% endif %}
-                </td>
+                <td class="rank">{{ loop.index + 3 }}</td>
                 <td>
                     {% if movie[1] %}
                         <img src="{{ movie[1] }}" alt="{{ movie[0] }}" class="movie-img-small">
@@ -55,10 +121,42 @@
             {% endfor %}
         </tbody>
     </table>
+    {% endif %}
 {% else %}
     <div class="no-movies">
         <p>No movies added yet!</p>
         <a href="/new" class="btn">Add Your First Movie</a>
     </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if movies and movies|length >= 1 %}
+<script>
+// Simple confetti generator for celebration
+(function() {
+  const container = document.getElementById('confetti');
+  if (!container) return;
+  const colors = ['#ff595e', '#ffca3a', '#8ac926', '#1982c4', '#6a4c93'];
+  const count = Math.min(180, 40 + ({{ movies|length }} * 10));
+  for (let i = 0; i < count; i++) {
+    const c = document.createElement('div');
+    c.className = 'confetti';
+    const size = 6 + Math.random() * 8;
+    c.style.width = size + 'px';
+    c.style.height = (size * 1.3) + 'px';
+    c.style.left = (Math.random() * 100) + 'vw';
+    c.style.top = (-10 - Math.random() * 30) + 'vh';
+    c.style.background = colors[Math.floor(Math.random() * colors.length)];
+    c.style.transform = `translateY(-10vh) rotate(${Math.random()*360}deg)`;
+    c.style.animationDuration = (2.8 + Math.random() * 1.6) + 's';
+    c.style.animationDelay = (Math.random() * 0.8) + 's';
+    c.style.opacity = (0.7 + Math.random() * 0.3);
+    container.appendChild(c);
+  }
+  // Cleanup after 5s
+  setTimeout(() => container.innerHTML = '', 5500);
+})();
+</script>
 {% endif %}
 {% endblock %}

@@ -21,10 +21,11 @@
         .error { color: red; text-align: center; padding: 20px; }
         .loading { display: none; text-align: center; color: #007bff; }
         .actions { margin-top: 16px; display: flex; justify-content: center; gap: 12px; }
-        .btn { background: #007bff; color: white; padding: 10px 16px; border: none; border-radius: 6px; cursor: pointer; }
+        .btn { background: #007bff; color: white; padding: 10px 16px; border: none; border-radius: 6px; cursor: pointer; transition: transform 0.38s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s ease; }
         .btn:hover { background: #0056b3; }
         .btn.secondary { background: #6c757d; }
         .btn.secondary:hover { background: #565e64; }
+        .btn.pressed { transform: scale(1.08); box-shadow: 0 8px 22px rgba(0,0,0,0.2); }
         .fly-token { position: fixed; z-index: 1000; background: #ffc107; color: #212529; padding: 6px 10px; border-radius: 999px; box-shadow: 0 3px 10px rgba(0,0,0,0.2); font-weight: bold; pointer-events: none; opacity: 0.95; transition: transform 0.38s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.18s ease-out; }
     </style>
 {% endblock %}
@@ -63,8 +64,8 @@
             </div>
 
             <div class="actions">
-                <button class="btn" onclick="tie({{ movies[0][0] }}, {{ movies[1][0] }})">It's a tie</button>
-                <button class="btn secondary" onclick="skip({{ movies[0][0] }}, {{ movies[1][0] }})">I haven't seen at least one</button>
+                <button id="tieBtn" class="btn" onclick="tie({{ movies[0][0] }}, {{ movies[1][0] }})">It's a tie</button>
+                <button id="skipBtn" class="btn secondary" onclick="skip({{ movies[0][0] }}, {{ movies[1][0] }})">I haven't seen at least one</button>
             </div>
             
             <div class="loading">
@@ -79,6 +80,13 @@
         const leftId = {{ movies[0][0] }};
         const rightId = {{ movies[1][0] }};
         let busy = false;
+        const PRESS_DURATION = 380; // match ELO fly animation duration
+
+        function pulseButton(el) {
+            if (!el) return;
+            el.classList.add('pressed');
+            setTimeout(() => el.classList.remove('pressed'), PRESS_DURATION);
+        }
 
         function revealElo() {
             document.querySelectorAll('.elo').forEach(el => el.classList.add('show'));
@@ -209,6 +217,7 @@
         function tie(movieAId, movieBId) {
             if (busy) return;
             busy = true;
+            pulseButton(document.getElementById('tieBtn'));
             revealElo();
 
             const leftE = getElo('left');
@@ -284,24 +293,28 @@
             // No need to reveal ELO for skip
             if (busy) return;
             busy = true;
-            startLoading();
-            fetch('/skip', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ movie_a_id: movieAId, movie_b_id: movieBId })
-            })
-            .then(response => response.json())
-            .then(data => { if (data.success) { location.reload(); } else { throw new Error('Skip failed'); } })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Error skipping this pair');
-                document.querySelector('.match-container').style.display = 'flex';
-                document.querySelector('.loading').style.display = 'none';
-                busy = false;
-            });
+            const btn = document.getElementById('skipBtn');
+            pulseButton(btn);
+            setTimeout(() => {
+                startLoading();
+                fetch('/skip', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ movie_a_id: movieAId, movie_b_id: movieBId })
+                })
+                .then(response => response.json())
+                .then(data => { if (data.success) { location.reload(); } else { throw new Error('Skip failed'); } })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error skipping this pair');
+                    document.querySelector('.match-container').style.display = 'flex';
+                    document.querySelector('.loading').style.display = 'none';
+                    busy = false;
+                });
+            }, PRESS_DURATION);
         }
 
-        // Keyboard support: Left/Right arrows select left/right movie
+        // Keyboard support: Left/Right select; Up=Tie; Down=Skip
         window.addEventListener('keydown', (e) => {
             if (busy) return;
             const containerVisible = getComputedStyle(document.querySelector('.match-container')).display !== 'none';
@@ -312,6 +325,12 @@
             } else if (e.key === 'ArrowRight') {
                 e.preventDefault();
                 vote(rightId, leftId);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                tie(leftId, rightId);
+            } else if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                skip(leftId, rightId);
             }
         });
     </script>
